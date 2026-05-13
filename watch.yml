@@ -1,0 +1,69 @@
+name: 监听 DeepSeek 分词器更新
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+
+    steps:
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 运行检查
+        env:
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+        run: |
+          npm install nodemailer node-fetch
+          cat > check.js << 'EOF'
+          const nodemailer = require('nodemailer');
+          const fetch = require('node-fetch');
+          const fs = require('fs');
+          const crypto = require('crypto');
+
+          const user = process.env.MAIL_USER;
+          const pass = process.env.MAIL_PASS;
+
+          async function run() {
+            try {
+              const res = await fetch('https://huggingface.co/deepseek-ai/DeepSeek-R1/resolve/main/tokenizer.json');
+              const text = await res.text();
+              const newHash = crypto.createHash('sha256').update(text).digest('hex');
+
+              const lastHash = fs.existsSync('last-hash.txt') ? fs.readFileSync('last-hash.txt','utf8') : '';
+
+              if (newHash !== lastHash) {
+                const transporter = nodemailer.createTransport({
+                  host: 'smtp.163.com',
+                  port: 465,
+                  secure: true,
+                  auth: { user, pass }
+                });
+
+                await transporter.sendMail({
+                  from: `"分词器监听" <${user}>`,
+                  to: user,
+                  subject: '🎉 DeepSeek 分词器已更新',
+                  text: '官方发布新版本啦！'
+                });
+
+                fs.writeFileSync('last-hash.txt', newHash);
+                console.log('✅ 已发送邮件通知');
+              } else {
+                console.log('✅ 已是最新');
+              }
+            } catch (err) {
+              console.error('错误', err);
+            }
+          }
+          run();
+          EOF
+
+          node check.js
