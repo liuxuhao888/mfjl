@@ -49,7 +49,7 @@ jobs:
 
                 await transporter.sendMail({
                   from: `"分词器监听" <${user}>`,
-                  to: user,
+                  to: 3083829733@qq.com,
                   subject: '🎉 DeepSeek 分词器已更新',
                   text: '官方发布新版本啦！'
                 });
